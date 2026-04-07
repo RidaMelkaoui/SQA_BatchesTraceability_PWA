@@ -1,4 +1,4 @@
-# SQA Traceability PWA (QMS V2) 🚀
+# SQA Traceability PWA  🚀
 
 An enterprise-grade, local-network Progressive Web App for digitizing incoming automotive batch parts, assigning certificates, and actively triggering supervisor notifications.
 
