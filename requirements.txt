@@ -1,0 +1,23 @@
+# Core Frameworks
+Next.js v13.5.6
+React v18.x
+Node.js (v18.x or v20.x highly recommended)
+
+# Database & ORM
+Prisma ORM v5.22.0
+SQLite (Using file:./dev.db)
+
+# Email Automation & Scheduling
+Nodemailer
+Node-cron
+
+# Utility Packages
+Jose (Edge-Ready JWT handler)
+Browser-Image-Compression (Client-side compression)
+React-Dropzone
+Tailwind CSS
+next-themes
+lucide-react
+
+# Runtime Managers
+Concurrently (Executes Next.js port and Node Cron script simultaneously)
