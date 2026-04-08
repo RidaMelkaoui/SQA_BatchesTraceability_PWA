@@ -45,4 +45,5 @@ next-env.d.ts
 # Electron build output
 dist/
 out/
-electron/assets/*.icns
+app/assets/*.icns
+electron-v*.zip

@@ -35,8 +35,13 @@ function getLocalIP() {
   return '127.0.0.1';
 }
 
-// ─── Start embedded server ──────────────────────────────────────────────────
+// ─── Start embedded server (only in production) ─────────────────────────────
 function startEmbeddedServer() {
+  const isDevMode = !fs.existsSync(path.join(__dirname, '..', 'out'));
+  if (isDevMode) {
+    console.log('[Electron] DEV MODE — skipping embedded server, using Next.js dev server on :3000');
+    return;
+  }
   try {
     embeddedServer = require('./server');
     embeddedServer.start(app.getPath('userData'));
@@ -48,14 +53,12 @@ function startEmbeddedServer() {
 
 // ─── Create Tray ────────────────────────────────────────────────────────────
 function createTray() {
-  // Use a simple base64 encoded 16x16 icon (blue square with Q)
   const iconPath = path.join(__dirname, 'assets', 'tray-icon.png');
   let trayIcon;
   
   if (fs.existsSync(iconPath)) {
     trayIcon = nativeImage.createFromPath(iconPath);
   } else {
-    // Fallback: create a minimal icon from the app's default
     trayIcon = nativeImage.createEmpty();
   }
 
@@ -64,33 +67,42 @@ function createTray() {
   function updateTrayMenu() {
     const peerCount = embeddedServer ? (embeddedServer.getPeerCount ? embeddedServer.getPeerCount() : 0) : 0;
     const localIP = getLocalIP();
+    const isDev = !fs.existsSync(path.join(__dirname, '..', 'out'));
+    const port = isDev ? 3000 : 8765;
     
     const contextMenu = Menu.buildFromTemplate([
       { label: 'SQA Traceability', enabled: false, type: 'normal' },
+      { label: isDev ? '🔧 DEV MODE' : '🏭 PRODUCTION', enabled: false },
       { type: 'separator' },
-      { label: `📡 IP: ${localIP}:8765`, enabled: false },
+      { label: `📡 IP: ${localIP}:${port}`, enabled: false },
       { label: `🔗 Peers connected: ${peerCount}`, enabled: false },
       { label: `✅ Server: Running`, enabled: false },
       { type: 'separator' },
       { label: 'Show App', click: () => { mainWindow?.show(); mainWindow?.focus(); } },
-      { label: 'Open in Browser', click: () => { shell.openExternal(`http://${localIP}:8765`); } },
+      { label: 'Open in Browser', click: () => { shell.openExternal(`http://${localIP}:${port}`); } },
       { type: 'separator' },
       { label: 'Quit', click: () => { app.isQuitting = true; app.quit(); } }
     ]);
     
     tray.setContextMenu(contextMenu);
-    tray.setToolTip(`SQA Traceability — ${localIP}:8765 — ${peerCount} peers`);
+    tray.setToolTip(`SQA Traceability — ${localIP}:${port} — ${peerCount} peers`);
   }
 
   tray.on('double-click', () => { mainWindow?.show(); mainWindow?.focus(); });
   
   updateTrayMenu();
-  // Refresh tray menu every 5 seconds
   setInterval(updateTrayMenu, 5000);
 }
 
 // ─── Create Main Window ─────────────────────────────────────────────────────
 function createWindow() {
+  // In dev mode (no out/ build), load Next.js dev server on port 3000
+  // In production, load our embedded Express server on port 8765
+  const isDevMode = !fs.existsSync(path.join(__dirname, '..', 'out'));
+  const startURL = isDevMode ? 'http://localhost:3000' : 'http://localhost:8765';
+
+  console.log(`[Electron] Loading ${isDevMode ? 'DEV (Next.js :3000)' : 'PROD (Embedded :8765)'}`);
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -107,17 +119,19 @@ function createWindow() {
     show: false, // Show only when ready
   });
 
-  // Load the embedded Express app
-  const startURL = 'http://localhost:8765';
-  
-  // Wait a moment for server to be ready then load
-  setTimeout(() => {
+  // Poll until server is ready, then load
+  function tryLoad(retries = 20) {
     mainWindow.loadURL(startURL).catch((err) => {
-      console.error('[Electron] Failed to load URL:', err);
-      // Retry after 2s
-      setTimeout(() => mainWindow?.loadURL(startURL), 2000);
+      if (retries > 0) {
+        console.log(`[Electron] Waiting for server... (${retries} retries left)`);
+        setTimeout(() => tryLoad(retries - 1), 1500);
+      } else {
+        console.error('[Electron] Could not connect to server:', err.message);
+      }
     });
-  }, 1500);
+  }
+
+  setTimeout(() => tryLoad(), 2000);
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();

@@ -1,54 +1,63 @@
-name: Build Electron .exe
+name: Build SQA Traceability .exe
 
 on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 jobs:
   build-windows:
     runs-on: windows-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci --ignore-scripts --legacy-peer-deps
 
       - name: Build Next.js static export
         run: npm run build:static
         env:
           NODE_ENV: production
+          ELECTRON_BUILD: true
 
-      - name: Build Electron .exe
-        run: npm run electron:dist
+      - name: Build Electron .exe (installer + portable)
+        run: npx electron-builder --win --publish never
         env:
+          NODE_ENV: production
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: SQA-Traceability-Windows
-          path: |
-            dist/*.exe
-            dist/*.yml
-          retention-days: 30
+      - name: List built artifacts
+        run: dir dist
 
-      - name: Create GitHub Release
+      - name: Upload installer to GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
+          name: "SQA Traceability ${{ github.ref_name }}"
+          body: |
+            ## SQA Traceability ${{ github.ref_name }}
+
+            ### Download Options
+            - **SQA-Traceability-Setup-x64.exe** — Full NSIS Installer (recommended). Installs the app, creates desktop & start menu shortcuts, automatically opens the Windows Firewall for LAN sync.
+            - **SQA-Traceability-x64-Portable.exe** — Portable version. No installation needed. Just run directly.
+
+            ### Default Login Credentials
+            - **Username**: Reda, Youssef, Khaoula, Aicha, or Manal
+            - **Password**: `SQA2026`
+
+            ### Network Access (for phone / other PCs)
+            After launching, other devices on the same WiFi can access the app at `http://<your-pc-ip>:8765`
           files: |
             dist/*.exe
-          generate_release_notes: true
           draft: false
           prerelease: false
         env:
