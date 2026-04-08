@@ -1,29 +1,43 @@
 {
-  "name": "temp-app",
-  "version": "0.1.0",
+  "name": "sqa-traceability",
+  "version": "3.0.0",
+  "description": "SQA Batch Traceability PWA — Enterprise QMS System",
   "private": true,
+  "main": "electron/main.js",
+  "author": "Reda Melkaoui <ridamelkaouiofficial@gmail.com>",
   "scripts": {
     "dev": "concurrently \"next dev -H 0.0.0.0\" \"node cron.js\"",
     "build": "next build",
+    "build:static": "cross-env ELECTRON_BUILD=true next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "electron:dev": "concurrently \"next dev -H 0.0.0.0 -p 3000\" \"wait-on tcp:3000 && electron .\"",
+    "electron:build": "npm run build:static && electron-builder",
+    "electron:dist": "npm run build:static && electron-builder --win"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "bonjour-service": "^1.3.0",
     "browser-image-compression": "^2.0.2",
     "concurrently": "^9.2.1",
+    "express": "^4.21.2",
     "jose": "^6.2.2",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.7.0",
+    "multer": "^2.0.1",
     "next": "13.5.6",
     "next-themes": "^0.4.6",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.5",
     "react": "^18",
     "react-dom": "^18",
-    "react-dropzone": "^15.0.0"
+    "react-dropzone": "^15.0.0",
+    "sql.js": "^1.14.0",
+    "uuid": "^9.0.1",
+    "ws": "^8.18.2"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/node-cron": "^3.0.11",
@@ -31,11 +45,69 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10",
+    "cross-env": "^7.0.3",
+    "electron": "28.3.3",
+    "electron-builder": "^25.1.8",
     "eslint": "^8",
     "eslint-config-next": "13.5.6",
     "postcss": "^8",
     "prisma": "^5.22.0",
     "tailwindcss": "^3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^9.0.4"
+  },
+  "build": {
+    "appId": "com.magna.sqa.traceability",
+    "productName": "SQA Traceability",
+    "copyright": "Copyright © 2026 Magna SQA",
+    "directories": {
+      "output": "dist",
+      "buildResources": "electron/assets"
+    },
+    "files": [
+      "electron/**/*",
+      "out/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "electron/assets",
+        "to": "assets"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "electron/assets/tray-icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "electron/assets/tray-icon.png",
+      "uninstallerIcon": "electron/assets/tray-icon.png",
+      "installerHeaderIcon": "electron/assets/tray-icon.png",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SQA Traceability",
+      "include": "electron/installer.nsh"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "RidaMelkaoui",
+      "repo": "SQA_BatchesTraceability_PWA"
+    }
   }
 }

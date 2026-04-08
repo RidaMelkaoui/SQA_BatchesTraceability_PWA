@@ -41,3 +41,8 @@ public/uploads/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Electron build output
+dist/
+out/
+electron/assets/*.icns
