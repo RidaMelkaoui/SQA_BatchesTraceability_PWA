@@ -37,10 +37,16 @@ function runMigrations() {
       id TEXT PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
+      email TEXT,
+      password_changed INTEGER DEFAULT 0,
       role TEXT DEFAULT 'OPERATOR',
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);
+
+  try { db.run("ALTER TABLE users ADD COLUMN email TEXT;"); } catch (e) {}
+  try { db.run("ALTER TABLE users ADD COLUMN password_changed INTEGER DEFAULT 0;"); } catch (e) {}
+
 
   db.run(`
     CREATE TABLE IF NOT EXISTS batches (
@@ -71,6 +77,26 @@ function runMigrations() {
     );
   `);
 
+  // Seed default users
+  const seeds = [
+    { u: 'Reda', e: 'rida.melkaoui@magna.com', r: 'ADMIN' },
+    { u: 'Youssef', e: 'ridamelkaouiofficial@gmail.com', r: 'ADMIN' },
+    { u: 'Khaoula', e: 'ridamelkaouiofficial@gmail.com', r: 'OPERATOR' },
+    { u: 'Aicha', e: 'ridamelkaouiofficial@gmail.com', r: 'OPERATOR' },
+    { u: 'Manal', e: 'ridamelkaouiofficial@gmail.com', r: 'OPERATOR' }
+  ];
+  const defaultPass = 'SQA2026';
+  
+  seeds.forEach(s => {
+    const existing = db.exec(`SELECT id FROM users WHERE LOWER(username) = LOWER('${s.u}')`);
+    if (!existing.length || !existing[0].values.length) {
+      db.run(
+        `INSERT INTO users (id, username, password, email, password_changed, role) VALUES (?, ?, ?, ?, 0, ?)`,
+        [uuidv4(), s.u, defaultPass, s.e, s.r]
+      );
+    }
+  });
+
   saveDatabase();
   console.log('[DB] Migrations complete');
 }
@@ -84,18 +110,32 @@ function findUserByUsername(username) {
   return rowToObject(result[0].columns, result[0].values[0]);
 }
 
-function createOrFindUser(username, password, role = 'OPERATOR') {
+function createOrFindUser(username, password, email, role = 'OPERATOR') {
   let user = findUserByUsername(username);
   if (!user) {
     const id = uuidv4();
     db.run(
-      `INSERT INTO users (id, username, password, role) VALUES (?, ?, ?, ?)`,
-      [id, username, password, role]
+      `INSERT INTO users (id, username, password, email, role) VALUES (?, ?, ?, ?, ?)`,
+      [id, username, password, email, role]
     );
     saveDatabase();
-    user = { id, username, password, role };
+    user = { id, username, password, email, password_changed: 0, role };
   }
   return user;
+}
+
+function updatePassword(userId, newPassword) {
+  db.run(
+    `UPDATE users SET password = ?, password_changed = 1 WHERE id = ?`,
+    [newPassword, userId]
+  );
+  saveDatabase();
+}
+
+function getAllUsers() {
+  const result = db.exec(`SELECT id, username, email, role, password_changed FROM users ORDER BY username ASC`);
+  if (!result.length) return [];
+  return result[0].values.map(row => rowToObject(result[0].columns, row));
 }
 
 // ─── Batches ─────────────────────────────────────────────────────────────────
@@ -213,6 +253,8 @@ function rowToObject(columns, row) {
     operator_username: obj.operator_username,
     username: obj.username,
     password: obj.password,
+    email: obj.email,
+    password_changed: obj.password_changed,
     role: obj.role,
   };
 }
@@ -222,6 +264,8 @@ module.exports = {
   saveDatabase,
   findUserByUsername,
   createOrFindUser,
+  updatePassword,
+  getAllUsers,
   getAllBatches,
   createBatch,
   updateBatchCertificate,

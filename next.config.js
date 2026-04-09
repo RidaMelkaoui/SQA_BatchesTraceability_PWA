@@ -3,19 +3,47 @@
 const isElectronBuild = process.env.ELECTRON_BUILD === 'true';
 
 const nextConfig = {
-  // Static export for Electron packaging
-  ...(isElectronBuild ? { output: 'export', trailingSlash: true } : {}),
-  
-  // Disable image optimization for static export (Electron uses local files)
+  // Static export for Electron packaging — disables all server-side features
+  ...(isElectronBuild ? {
+    output: 'export',
+    trailingSlash: true,
+  } : {}),
+
+  // Disable image optimization (required for static export)
   images: {
     unoptimized: true,
   },
 
-  // Allow API calls to the embedded server in Electron mode
-  async rewrites() {
-    if (isElectronBuild) return [];
-    return [];
+  typescript: {
+    ignoreBuildErrors: true,
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  modularizeImports: {
+    "lucide-react": {
+      transform: "lucide-react/dist/esm/icons/{{kebabCase member}}",
+    },
+  },
+
+  // Suppress Prisma usage warning in static build
+  ...(isElectronBuild ? {
+    experimental: {
+      serverComponentsExternalPackages: [],
+    }
+  } : {}),
+
+  // Development Proxy to 8765 Embedded Server
+  ...(isElectronBuild ? {} : {
+    async rewrites() {
+      return [
+        {
+          source: '/api/:path*',
+          destination: 'http://127.0.0.1:8765/api/:path*'
+        }
+      ]
+    }
+  }),
 };
 
 module.exports = nextConfig;

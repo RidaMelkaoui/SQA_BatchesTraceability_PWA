@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
-const { SignJWT, jwtVerify } = require('jose');
+const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const nodemailer = require('nodemailer');
 const cron = require('node-cron');
@@ -13,10 +13,8 @@ const discovery = require('./discovery');
 const { v4: uuidv4 } = require('uuid');
 
 const PORT = 8765;
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'sqa-intranet-secret-2026');
+const JWT_SECRET = process.env.JWT_SECRET || 'sqa-intranet-secret-2026';
 const TARGET_EMAIL = process.env.SMTP_TARGET || 'ridamelkaouiofficial@gmail.com';
-const AUTHORIZED_USERS = ['Reda', 'Youssef', 'Khaoula', 'Aicha', 'Manal'];
-const HARDCODED_PASSWORD = 'SQA2026';
 
 let app = null;
 let server = null;
@@ -44,7 +42,7 @@ async function verifyToken(req) {
   let token = req.cookies?.auth_token || req.headers.authorization?.replace('Bearer ', '');
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET);
     return payload;
   } catch { return null; }
 }
@@ -153,22 +151,49 @@ async function start(userDataPath) {
   app.post('/api/auth/login', async (req, res) => {
     try {
       const { username, password } = req.body;
-      const match = AUTHORIZED_USERS.find(u => u.toLowerCase() === username?.toLowerCase());
-      if (!match || password !== HARDCODED_PASSWORD) {
+      const user = db.findUserByUsername(username);
+
+      if (!user || user.password !== password) {
         return res.status(401).json({ error: 'Invalid credentials.' });
       }
 
-      const user = db.createOrFindUser(match, HARDCODED_PASSWORD, 'OPERATOR');
-      const token = await new SignJWT({ id: user.id, username: user.username, role: user.role })
-        .setProtectedHeader({ alg: 'HS256' })
-        .setIssuedAt()
-        .setExpirationTime('24h')
-        .sign(JWT_SECRET);
+      const token = jwt.sign(
+        { id: user.id, username: user.username, role: user.role },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
 
       res.setHeader('Set-Cookie', `auth_token=${token}; Path=/; HttpOnly; Max-Age=86400; SameSite=Lax`);
-      res.json({ success: true, user: { id: user.id, username: user.username, role: user.role } });
+      res.json({ success: true, user: { id: user.id, username: user.username, role: user.role, password_changed: user.password_changed } });
     } catch (err) {
       console.error('[Auth]', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // AUTH: Change Password
+  app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+    try {
+      const { newPassword } = req.body;
+      if (!newPassword) return res.status(400).json({ error: 'Missing new password' });
+      db.updatePassword(req.user.id, newPassword);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // USERS: Admin create user
+  app.post('/api/users', requireAuth, async (req, res) => {
+    try {
+      if (req.user.role !== 'ADMIN') return res.status(403).json({ error: 'Forbidden' });
+      const { username, password, email, role } = req.body;
+      if (!username || !password) return res.status(400).json({ error: 'Missing fields' });
+      const newUser = db.createOrFindUser(username, password, email, role || 'OPERATOR');
+      res.json({ success: true, user: { 
+        id: newUser.id, username: newUser.username, role: newUser.role, email: newUser.email 
+      }});
+    } catch (err) {
       res.status(500).json({ error: 'Internal server error' });
     }
   });

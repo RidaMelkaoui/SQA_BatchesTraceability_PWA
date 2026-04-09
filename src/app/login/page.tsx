@@ -7,6 +7,8 @@ import { Lock, User } from "lucide-react";
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [requireChange, setRequireChange] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -24,14 +26,52 @@ export default function LoginPage() {
       });
 
       if (res.ok) {
-        router.push("/dashboard");
-        router.refresh();
+        const data = await res.json();
+        localStorage.setItem("user", JSON.stringify(data.user));
+        if (!data.user.password_changed) {
+          setRequireChange(true);
+        } else {
+          router.push("/dashboard");
+          router.refresh();
+        }
       } else {
         const data = await res.json();
         setError(data.error || "Login Failed");
       }
     } catch (err) {
       setError("An error occurred during login.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword }),
+      });
+
+      if (res.ok) {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          user.password_changed = 1;
+          localStorage.setItem("user", JSON.stringify(user));
+        }
+        router.push("/dashboard");
+        router.refresh();
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to change password");
+      }
+    } catch (err) {
+      setError("An error occurred during password change.");
     } finally {
       setLoading(false);
     }
@@ -45,19 +85,22 @@ export default function LoginPage() {
             <span className="text-white font-extrabold text-3xl">Q</span>
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">SQA Traceability</h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">Sign in to your authorized account</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">
+             {requireChange ? "Set your personal password to continue" : "Sign in to your authorized account"}
+          </p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          {error && (
-            <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl text-sm text-center font-medium animate-in slide-in-from-top-2">
-              {error}
-            </div>
-          )}
+        {!requireChange ? (
+          <form onSubmit={handleLogin} className="space-y-6">
+            {error && (
+              <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl text-sm text-center font-medium animate-in slide-in-from-top-2">
+                {error}
+              </div>
+            )}
 
-          <div className="space-y-5">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">Username</label>
+            <div className="space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">Username</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
                   <User className="h-5 w-5" />
@@ -91,14 +134,50 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex justify-center py-3.5 px-4 rounded-xl shadow-lg shadow-blue-500/30 text-sm font-black tracking-wide text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 mt-2"
-          >
-            {loading ? "Authenticating..." : "Sign In"}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex justify-center py-3.5 px-4 rounded-xl shadow-lg shadow-blue-500/30 text-sm font-black tracking-wide text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 mt-2"
+            >
+              {loading ? "Authenticating..." : "Sign In"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleChangePassword} className="space-y-6 animate-in slide-in-from-right-4 duration-500">
+            {error && (
+              <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl text-sm text-center font-medium animate-in slide-in-from-top-2">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5 ml-1">New Personal Password</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                    <Lock className="h-5 w-5" />
+                  </div>
+                  <input
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="pl-11 w-full rounded-xl border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 p-3.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                    placeholder="Enter new password"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex justify-center py-3.5 px-4 rounded-xl shadow-lg shadow-blue-500/30 text-sm font-black tracking-wide text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.98] outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 mt-2"
+            >
+              {loading ? "Saving..." : "Save Password & Enter"}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

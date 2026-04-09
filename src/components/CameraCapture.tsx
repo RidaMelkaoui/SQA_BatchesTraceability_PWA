@@ -31,9 +31,7 @@ export default function CameraCapture({ onUploadComplete }: { onUploadComplete: 
       // Create FormData & upload via API
       const formData = new FormData();
       formData.append("labelImage", compressedFile);
-      // Mocking reference and operator data for now
-      formData.append("reference", "BATCH-" + Math.floor(Math.random() * 10000)); 
-      formData.append("operatorId", "mock_operator_123"); 
+      formData.append("reference", "BATCH-" + Math.floor(Math.random() * 100000)); 
 
       const response = await fetch("/api/batches/receive", {
         method: "POST",

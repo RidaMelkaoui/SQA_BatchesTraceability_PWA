@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-const APP_DIR = path.join(__dirname, 'app');
+const APP_DIR = path.join(__dirname, 'backend');
 const OUT_DIR = path.join(__dirname, 'out');
 
 let mainWindow = null;
@@ -34,12 +34,8 @@ function getLocalIP() {
   return '127.0.0.1';
 }
 
-// ─── Start embedded server (prod only) ──────────────────────────────────────
+// ─── Start embedded server (Prod and Dev) ───────────────────────────────────
 function startEmbeddedServer() {
-  if (!fs.existsSync(OUT_DIR)) {
-    console.log('[Electron] DEV MODE — using Next.js dev server on :3000');
-    return;
-  }
   try {
     embeddedServer = require(path.join(APP_DIR, 'server.js'));
     embeddedServer.start(app.getPath('userData'));
@@ -61,7 +57,7 @@ function createTray() {
 
   function updateTrayMenu() {
     const isDev = !fs.existsSync(OUT_DIR);
-    const port = isDev ? 3000 : 8765;
+    const port = isDev ? 3000 : 8765; // The UI port
     const localIP = getLocalIP();
     const peerCount = embeddedServer?.getPeerCount?.() || 0;
 
